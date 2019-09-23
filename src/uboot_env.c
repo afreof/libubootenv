@@ -600,6 +600,11 @@ static int devwrite(struct uboot_ctx *ctx, unsigned int copy, void *data)
 
 	dev = &ctx->envdevs[copy];
 
+	// remove hardware write protection if needed
+	if (dev->prot_handler) {
+		env_unprotect(dev->prot_handler);
+	}
+
 	dev->fd = open(dev->devname, O_RDWR);
 	if (dev->fd < 0)
 		return -EBADF;
@@ -619,7 +624,14 @@ static int devwrite(struct uboot_ctx *ctx, unsigned int copy, void *data)
 		break;
 	};
 
+	// ensure all data are written before we might enable the read-only flag on the environment
+	fsync(dev->fd);
 	close(dev->fd);
+
+	// enforce hardware write protection again if it was active before this write
+	if (dev->prot_handler) {
+		env_reprotect(dev->prot_handler);
+	}
 
 	return ret;
 }
@@ -792,6 +804,12 @@ static int libuboot_load(struct uboot_ctx *ctx)
 		crcenv[i] = dev->crc == crc;
 		if (ctx->redundant)
 			dev->flags = *(uint8_t *)(buf[i] + offsetflags);
+
+		ret = env_protect_probe(&(dev->prot_handler), dev->devname);
+		if(ret < 0) {
+			free(buf[0]);
+			return ret;
+		}
 	}
 	if (!ctx->redundant) {
 		ctx->current = 0;
@@ -1225,6 +1243,19 @@ int libuboot_configure(struct uboot_ctx *ctx,
 	return 0;
 }
 
+void libuboot_unconfigure(struct uboot_ctx *ctx) {
+	struct uboot_flash_env *dev;
+	int i;
+	for (i = 0; i < 2; i++) {
+		dev = &ctx->envdevs[i];
+		if (!dev)
+			break;
+		if (dev->prot_handler) {
+			free(dev->prot_handler);
+		}
+	}
+}
+
 int libuboot_initialize(struct uboot_ctx **out,
 			struct uboot_env_device *envdevs) {
 	struct uboot_ctx *ctx;
@@ -1273,5 +1304,6 @@ void libuboot_close(struct uboot_ctx *ctx) {
 }
 
 void libuboot_exit(struct uboot_ctx *ctx) {
+	libuboot_unconfigure(ctx);
 	free(ctx);
 }

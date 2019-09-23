@@ -2,6 +2,7 @@ cmake_minimum_required (VERSION 2.6)
 # Sources and private headers
 SET(libubootenv_SOURCES
   uboot_env.c
+  uboot_env_unprotect.c
   uboot_private.h
 )
 

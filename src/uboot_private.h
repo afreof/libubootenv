@@ -12,6 +12,7 @@
 #include <sys/queue.h>
 #include <mtd/mtd-user.h>
 #include "libuboot.h"
+#include "uboot_env_unprotect.h"
 
 typedef enum {
 	TYPE_ATTR_STRING,	/* default */
@@ -87,6 +88,8 @@ struct uboot_flash_env {
 	enum flags_type		flagstype;
 	/** type of device (mtd, ubi, file, ....) */
 	enum device_type	device_type;
+	/** Optional flash protection handling */
+	env_protect_t		*prot_handler;
 };
 
 /** Internal structure for an environment variable
